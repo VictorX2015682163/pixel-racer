@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="description" content="极速赛车：切换车道躲避车辆，收集金币并刷新最高分。" />
+<meta name="theme-color" content="#0f1a2c" />
+<title>极速赛车 · Racer</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    background: #0f1a2c;
+    color: #e6edf6;
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", monospace;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .wrap {
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .hud {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    padding: 10px 14px;
+    background: #1a2540;
+    border: 2px solid #2a3a60;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 14px;
+    flex-wrap: wrap;
+    max-width: 95vw;
+  }
+  .hud .item { display: flex; align-items: center; gap: 6px; }
+  .hud .label { color: #8a9bbd; font-weight: 500; font-size: 13px; }
+  .hud .val { font-variant-numeric: tabular-nums; }
+  .hud .score { color: #ffd24a; }
+  .hud .best  { color: #6bd6ff; }
+  .hud .speed { color: #b8f06a; }
+  .hud .hp    { color: #ff8a8a; letter-spacing: 2px; }
+
+  canvas {
+    display: block;
+    background: #1a2030;
+    border: 2px solid #2a3a60;
+    border-radius: 12px;
+    image-rendering: pixelated;
+    image-rendering: -moz-crisp-edges;
+    touch-action: none;
+    cursor: pointer;
+    max-width: 95vw;
+    max-height: 75vh;
+    height: auto;
+  }
+  .hint {
+    color: #8a9bbd;
+    font-size: 12px;
+    text-align: center;
+    line-height: 1.5;
+  }
+  .hint kbd {
+    background: #243254;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    color: #e6edf6;
+  }
+
+  .back-btn {
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    background: #1a2540;
+    border: 2px solid #2a3a60;
+    color: #e6edf6;
+    padding: 8px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    text-decoration: none;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    z-index: 10;
+  }
+  .back-btn:hover { background: #2a3a60; }
+
+  .overlay {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    background: rgba(15, 26, 44, 0.92);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 20;
+    backdrop-filter: blur(6px);
+  }
+  .overlay.hidden { display: none; }
+  .overlay-card {
+    background: #1a2540;
+    border: 3px solid #6dd478;
+    border-radius: 16px;
+    padding: 28px 36px;
+    text-align: center;
+    max-width: 90vw;
+  }
+  .overlay-card.lose { border-color: #ff6b7a; }
+  .overlay-card h1 {
+    font-size: 30px;
+    margin-bottom: 14px;
+    color: #6dd478;
+  }
+  .overlay-card.lose h1 { color: #ff6b7a; }
+  .overlay-card .stats {
+    background: #243254;
+    padding: 14px;
+    border-radius: 8px;
+    margin-bottom: 18px;
+    font-size: 15px;
+    line-height: 1.7;
+  }
+  .overlay-card .stats .big {
+    font-size: 26px;
+    font-weight: 900;
+    color: #ffd24a;
+  }
+  .overlay-card .stats .new {
+    color: #b8f06a;
+    font-size: 12px;
+    margin-left: 6px;
+  }
+  .overlay-card button {
+    background: #ffd24a;
+    border: none;
+    color: #1a2540;
+    padding: 12px 24px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 700;
+    font-size: 14px;
+    margin: 4px;
+  }
+  .overlay-card button:hover { filter: brightness(1.1); }
+  .overlay-card button.secondary { background: #6bd6ff; }
+</style>
+<link rel="stylesheet" href="./styles.css" />
+</head>
+<body class="game-page game-page--racer">
+
+<div class="wrap">
+  <div class="hud">
+    <div class="item"><span class="label">距离</span><span class="val score" id="hudScore">0</span></div>
+    <div class="item"><span class="label">速度</span><span class="val speed" id="hudSpeed">0</span></div>
+    <div class="item"><span class="label">生命</span><span class="val hp" id="hudHp">♥♥♥</span></div>
+    <div class="item"><span class="label">最高</span><span class="val best" id="hudBest">0</span></div>
+  </div>
+  <canvas id="game" width="360" height="600" aria-label="极速赛车游戏画布"></canvas>
+  <div class="hint">
+    <kbd>←</kbd> <kbd>→</kbd> 或 <kbd>A</kbd> <kbd>D</kbd> 切换车道 · <kbd>↑</kbd> <kbd>↓</kbd> 加减速 · 手机滑屏
+  </div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="overlay-card" id="overlayCard">
+    <h1 id="overlayTitle">🏎 极速赛车</h1>
+    <div class="stats" id="overlayStats">
+      <b>左右切换车道</b>，躲避前方车辆<br>
+      碰到金币 +20 分<br>
+      撞车扣血 · 3 血归零结束<br>
+      速度越快得分越多
+    </div>
+    <button id="startBtn" type="button">开始游戏</button>
+  </div>
+</div>
+
+<script src="./racer.js"></script>
+</body>
+</html>
